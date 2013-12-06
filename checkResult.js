@@ -21,7 +21,7 @@ function checkFile(filepath, identification) {
 }
 
 function checkGuoneiP2P() {
-    checkFile('./guneiall.txt', 'op_ticket_ifrFlash');
+    checkFile('./guneiall.txt', 'op_ticket_ifrFlash'); // 参数1：词表文件，一词一行；参数2：需要检查的标识字符串
 }
 
 checkGuoneiP2P();
