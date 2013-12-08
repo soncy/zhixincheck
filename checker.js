@@ -1,8 +1,8 @@
 var lineReader = require('line-reader');
 var httpExt = require('./lib/httpExt');
 
-var reqcount = 0,
-  rescount = 0; // 请求数和回调数，用于判断是否全部检查完毕
+var reqcount = 0;
+var rescount = 0; // 请求数和回调数，用于判断是否全部检查完毕
 var timeoutKeyWords = []; // 检查超时或者报错的关键词
 var errKeyWors = []; // 没有匹配到的关键词
 
