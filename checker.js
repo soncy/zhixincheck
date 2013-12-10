@@ -1,80 +1,73 @@
 var lineReader = require('line-reader');
+var EventEmitter = require('events').EventEmitter;
+var util = require('util');
 var httpExt = require('./lib/httpExt');
 
-var reqcount = 0;
-var rescount = 0; // 请求数和回调数，用于判断是否全部检查完毕
-var timeoutKeyWords = []; // 检查超时或者报错的关键词
-var errKeyWors = []; // 没有匹配到的关键词
+var identification, noResultKeywords, errKeywords;
+var reqCount, resCount;
+var timeout = 5000;
 
-function Chcker() {
-  this.doneCallback = function() {};
-  this.timeout = 5000;
+function checkContent(keyword, content) {
+   if(!~content.indexOf(identification)) {
+     noResultKeywords.push(keyword);
+     console.log('没有找到匹配,关键词：' + keyword);
+   };
 }
-Chcker.fn = Chcker.prototype;
 
-Chcker.fn.check = function(path, identification, callback, timeout) {
-  var self = this;
-  var readend = false;
-  this.doneCallback = callback;
-  this.timeout = timeout;
+function Checker() {
+  EventEmitter.call(this);
 
-  lineReader.eachLine(path, function(line, last) {
-    self.checkLine(line, identification);
-    reqcount++;
-  }).then(function() {
-    readend = true;
+  this.on('getSourceCode', function(keyword, content) {
+    checkContent(keyword, content);
   });
 }
 
-/* 检查是否完毕，完毕就回调 */
-Chcker.fn.checkEnd = function() {
-  rescount++;
-  if (reqcount === rescount) {
-    this.doneCallback({
-      timeout: timeoutKeyWords,
-      notReg: errKeyWors
+util.inherits(Checker, EventEmitter);
+Checker.fn = Checker.prototype;
+
+Checker.fn.checkLine = function(keyword) {
+  var self = this;
+  var url = 'http://www.baidu.com/s?wd=' + keyword;
+
+  var req = httpExt.get(url, timeout, function(data) {
+    self.emit('getSourceCode', keyword, data);
+    self.checkEnd();
+  });
+  reqCount ++;
+
+  req.on('timeout', function() {
+    errKeywords.push(keyword);
+    self.checkEnd();
+  });
+  req.on('error', function(err) {
+    errKeywords.push(keyword);
+    console.log(err, keyword);
+    self.checkEnd();
+  });
+  return this;
+};
+
+Checker.fn.checkEnd = function() {
+  resCount++;
+  if (reqCount === resCount) {
+    this.emit('end', {
+      "error": errKeywords,
+      "noReg": noResultKeywords
     });
   }
 };
 
-/* 逐行检查 */
-Chcker.fn.checkLine = function(keyword, identification) {
-  var self = this;
-  keyword = keyword.trim();
-  this.getSourceCode(keyword, function(content) {
-    if (!~content.indexOf(identification)) { // 检查搜索结果中是否有需要检查的关键字
-      console.info('没有匹配的搜索词：' + keyword);
-      errKeyWors.push(keyword);
-    }
-    self.checkEnd();
+module.exports.check = function(filePath, ic, to) {
+  noResultKeywords = [];
+  errKeywords = [];
+  timeout = to;
+  identification = ic;
+  reqCount = 0;
+  resCount = 0;
+
+  var checker = new Checker();
+  lineReader.eachLine(filePath, function(line) {
+    checker.checkLine(line);
   });
-};
-
-/* 获取搜索结果源码 */
-Chcker.fn.getSourceCode = function(keyword, callback) {
-  var timeoutEvent;
-  var self = this;
-  var url = ["http://www.baidu.com/s?eid=13942&zhixin=13941&ip=220.181.3.105&ie=utf-8&bs=",
-    keyword, "&f=8&rsv_bp=1&wd=", keyword, "&inputT=0"
-  ].join('');
-
-  // 第二个参数为超时时间
-  var req = httpExt.get(url, this.timeout, function(res) {
-
-    var content = '';
-    res.on('data', function(d) {
-      content += d.toString();
-    });
-
-    res.on('end', function() {
-      callback(content);
-    });
-
-  }, function() {
-    timeoutKeyWords.push(keyword);
-    self.checkEnd();
-  });
-};
-
-var checker = new Chcker();
-module.exports = checker;
+  return checker;
+}

@@ -9,17 +9,16 @@
 var fs = require('fs');
 var path = require('path');
 var checker = require('./checker');
-var events = require('events');
-var util = require("util");
 
 function checkFile(filepath, identification) {
   var dirname = path.dirname(filepath);
-  checker.check(filepath, identification, function(result) {
-    // 检查结果 result.timeout : 检查超时的词表, result.notReg : 没有匹配的词表
-    fd = fs.open(path.join(dirname, identification + '_result.txt'), 'w+', function(err, fd) {
+  checker.check(filepath, identification, 3000).on('end', function(result) {
+    // 检查结果 result.error : 检查超时或请求错误的词表, result.noReg : 没有匹配的词表
+    var resultFilePath = path.join(dirname, identification + '_result.txt');
+    fd = fs.open(resultFilePath, 'w+', function(err, fd) {
       fs.write(fd, JSON.stringify(result));
     });
-  }, 3000); // 3000为单个请求超时时间，单位毫秒，不设置为5000毫秒
+  }); // 3000为单个请求超时时间，单位毫秒，不设置为5000毫秒
 }
 
 function checkGuoneiP2P() {
